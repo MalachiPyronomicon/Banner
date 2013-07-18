@@ -10,13 +10,12 @@
 // * 2013-05-16	-	0.1.2		-	jointeam doesnt work for initial team selection
 // * 2013-05-16	-	0.1.3		-	add timer stuff
 // * 2013-05-16	-	0.1.4		-	add support for color
+// * 2013-05-16	-	0.1.5		-	fix defines for banner
 //	------------------------------------------------------------------------------------
 
 
 // INCLUDES
 #include <sourcemod>
-//#include <sdktools>
-//#include <tf2>
 #include <donator>
 #include <clientprefs>
 
@@ -25,14 +24,14 @@
 
 
 // DEFINES
-#define PLUGIN_VERSION	"0.1.4"
+#define PLUGIN_VERSION	"0.1.5"
 
 // for SetHudTextParamsEx()
 #define HUDTEXT_X_COORDINATE	-1.0
 #define HUDTEXT_Y_COORDINATE	0.22
-#define HUDTEXT_HOLDTIME	8
-#define HUDTEXT_COLOR1	{255, 255, 255, 255}
-#define HUDTEXT_COLOR2	{0, 0, 0, 255}
+#define HUDTEXT_HOLDTIME	8.0
+#define HUDTEXT_WHITE	{255, 255, 255, 255}
+#define HUDTEXT_BLACK	{0, 0, 0, 255}
 #define HUDTEXT_EFFECT	1
 #define HUDTEXT_FXTIME	9.0
 #define HUDTEXT_FADEINTIME	0.15
@@ -84,7 +83,7 @@ public OnPostDonatorCheck(client)
 		g_bClientStatus[client]=true;
 
 		// Grab the banner color from the cookie
-		g_iTagColor[client] = {255, 255, 255, 255};
+		g_iTagColor[client] = HUDTEXT_WHITE;
 		
 		new String:szBuffer[256];
 		if (AreClientCookiesCached(client))
@@ -158,9 +157,7 @@ public ShowDonatorMessage(iClient, String:message[])
 	PrintToServer("[Donator:Banner] Show Banner");
 
 	// Set up text location/params
-//	SetHudTextParamsEx(HUDTEXT_X_COORDINATE, HUDTEXT_Y_COORDINATE, HUDTEXT_HOLDTIME, {255, 255, 255, 255}, {0, 0, 0, 255}, HUDTEXT_EFFECT, HUDTEXT_FXTIME, HUDTEXT_FADEINTIME, HUDTEXT_FADEOUTTIME);
-//	SetHudTextParamsEx(-1.0, 0.22, 8.0, {255, 255, 255, 255}, {0, 0, 0, 255}, 1, 9.0, 0.15, 0.15);
-	SetHudTextParamsEx(-1.0, 0.22, 4.0, g_iTagColor[iClient], {0, 0, 0, 255}, 1, 5.0, 0.15, 0.15);
+	SetHudTextParamsEx(HUDTEXT_X_COORDINATE, HUDTEXT_Y_COORDINATE, HUDTEXT_HOLDTIME, g_iTagColor[iClient], HUDTEXT_BLACK, HUDTEXT_EFFECT, HUDTEXT_FXTIME, HUDTEXT_FADEINTIME, HUDTEXT_FADEOUTTIME);
 
 	// Display to all players
 	for(new i = 1; i <= MaxClients; i++)
