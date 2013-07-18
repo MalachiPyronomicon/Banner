@@ -7,6 +7,9 @@
 //
 // * Changelog (date/version/description):
 // * 2013-05-16	-	0.1.1		-	initial test version
+// * 2013-05-16	-	0.1.2		-	jointeam doesnt work for initial team selection
+// * 2013-05-16	-	0.1.3		-	add timer stuff
+// * 2013-05-16	-	0.1.4		-	add support for color
 //	------------------------------------------------------------------------------------
 
 
@@ -15,14 +18,14 @@
 //#include <sdktools>
 //#include <tf2>
 #include <donator>
-//#include <clientprefs>
+#include <clientprefs>
 
 
 #pragma semicolon 1
 
 
 // DEFINES
-#define PLUGIN_VERSION	"0.1.1"
+#define PLUGIN_VERSION	"0.1.4"
 
 // for SetHudTextParamsEx()
 #define HUDTEXT_X_COORDINATE	-1.0
@@ -38,7 +41,10 @@
 
 // GLOBALS
 new g_bClientStatus[MAXPLAYERS + 1] = {false, ...};
+new Handle:g_hTimerHandle[MAXPLAYERS + 1] = {INVALID_HANDLE, ...};
 new Handle:g_HudSync = INVALID_HANDLE;
+new Handle:g_TagColorCookie = INVALID_HANDLE;
+new g_iTagColor[MAXPLAYERS + 1][4];
 
 
 public Plugin:myinfo = 
@@ -55,7 +61,9 @@ public OnPluginStart()
 {
 	PrintToServer("[Donator:Banner] Plugin start...");
 	g_HudSync = CreateHudSynchronizer();
-	RegConsoleCmd("jointeam", Command_Jointeam, "Jointeam");
+	HookEvent("player_team", EventTeamChange, EventHookMode_Post);
+	g_TagColorCookie = RegClientCookie("donator_tagcolor", "Chat color for donators.", CookieAccess_Private);
+
 }
 
 
@@ -74,6 +82,24 @@ public OnPostDonatorCheck(client)
 	{
 		PrintToServer("[Donator:Banner] Post Donator Check = TRUE");
 		g_bClientStatus[client]=true;
+
+		// Grab the banner color from the cookie
+		g_iTagColor[client] = {255, 255, 255, 255};
+		
+		new String:szBuffer[256];
+		if (AreClientCookiesCached(client))
+		{
+			GetClientCookie(client, g_TagColorCookie, szBuffer, sizeof(szBuffer));
+			if (strlen(szBuffer) > 0)
+			{
+				decl String:szTmp[3][16];
+				ExplodeString(szBuffer, " ", szTmp, 3, sizeof(szTmp[]));
+				g_iTagColor[client][0] = StringToInt(szTmp[0]); 
+				g_iTagColor[client][1] = StringToInt(szTmp[1]);
+				g_iTagColor[client][2] = StringToInt(szTmp[2]);
+			}
+		}
+		
 	}
 	else
 	{
@@ -86,37 +112,55 @@ public OnPostDonatorCheck(client)
 
 
 // If client joins a team and status=true, show msg and set status=false
-// Do we prefer jointeam or selectclass...
-public Action:Command_Jointeam(client, args) 
+public Action:EventTeamChange(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+	new team = GetEventInt(event, "team");
+
 	if (g_bClientStatus[client])
 	{
-		PrintToServer("[Donator:Banner] Join Team - Status=TRUE");
+		PrintToServer("[Donator:Banner] Player Team - Status=TRUE, team=%d", team);
 		new String:szBuffer[256];
 		GetDonatorMessage(client, szBuffer, sizeof(szBuffer));
 		ShowDonatorMessage(client, szBuffer);
+		
+		// we only show the intro once
 		g_bClientStatus[client]=false;
 	}
+	else
+	{
+		PrintToServer("[Donator:Banner] Player Team - Status=FALSE, team=%d", team);
+	}
+	
 	return Plugin_Continue;
 }
 
 
-// We prolly dont really need this, but included to be safe
+// Cleanup when player leaves
 public OnClientDisconnect(client)
 {
 	PrintToServer("[Donator:Banner] Disconnect - reset status");
+
+	// kill timer if we quickly disconnect
+	if(g_hTimerHandle[client] != INVALID_HANDLE)
+	{
+		KillTimer(g_hTimerHandle[client]);
+		g_hTimerHandle[client] = INVALID_HANDLE;
+	}
+	
 	g_bClientStatus[client]=false;
 }
 
 
-// Copied from donator.recognition.tf2.sp
+// Copied from donator.recognition.tf2.sp v0.5.15
 public ShowDonatorMessage(iClient, String:message[])
 {
 	PrintToServer("[Donator:Banner] Show Banner");
 
 	// Set up text location/params
 //	SetHudTextParamsEx(HUDTEXT_X_COORDINATE, HUDTEXT_Y_COORDINATE, HUDTEXT_HOLDTIME, {255, 255, 255, 255}, {0, 0, 0, 255}, HUDTEXT_EFFECT, HUDTEXT_FXTIME, HUDTEXT_FADEINTIME, HUDTEXT_FADEOUTTIME);
-	SetHudTextParamsEx(-1.0, 0.22, 4.0, {255, 255, 255, 255}, {0, 0, 0, 255}, 1, 5.0, 0.15, 0.15);
+//	SetHudTextParamsEx(-1.0, 0.22, 8.0, {255, 255, 255, 255}, {0, 0, 0, 255}, 1, 9.0, 0.15, 0.15);
+	SetHudTextParamsEx(-1.0, 0.22, 4.0, g_iTagColor[iClient], {0, 0, 0, 255}, 1, 5.0, 0.15, 0.15);
 
 	// Display to all players
 	for(new i = 1; i <= MaxClients; i++)
@@ -132,6 +176,21 @@ public ShowDonatorMessage(iClient, String:message[])
 
 
 
+// Cleanup all timers on map end
+public OnMapEnd()
+{
+
+	// Kill timers for all players
+	for(new i = 0; i <= (MAXPLAYERS + 1); i++)
+	{
+		if(g_hTimerHandle[i] != INVALID_HANDLE)
+		{
+			KillTimer(g_hTimerHandle[i]);
+			g_hTimerHandle[i] = INVALID_HANDLE;
+		}
+	}
+
+}
 
 
 
