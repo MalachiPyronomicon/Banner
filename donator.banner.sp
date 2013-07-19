@@ -12,6 +12,7 @@
 // * 2013-05-16	-	0.1.4		-	add support for color
 // * 2013-05-16	-	0.1.5		-	fix defines for banner
 // * 2013-05-16	-	0.1.6		-	add menu handling
+// * 2013-05-16	-	0.1.7		-	fix array index out of bounds (line 236)
 //	------------------------------------------------------------------------------------
 
 
@@ -25,7 +26,7 @@
 
 
 // DEFINES
-#define PLUGIN_VERSION	"0.1.6"
+#define PLUGIN_VERSION	"0.1.7"
 
 // for SetHudTextParamsEx()
 #define HUDTEXT_X_COORDINATE	-1.0
@@ -231,7 +232,7 @@ public OnMapEnd()
 {
 
 	// Kill timers for all players
-	for(new i = 0; i <= (MAXPLAYERS + 1); i++)
+	for(new i = 0; i < (MAXPLAYERS + 1); i++)
 	{
 		if(g_hTimerHandle[i] != INVALID_HANDLE)
 		{
