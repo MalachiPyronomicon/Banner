@@ -13,6 +13,7 @@
 // * 2013-05-16	-	0.1.5		-	fix defines for banner
 // * 2013-05-16	-	0.1.6		-	add menu handling
 // * 2013-05-16	-	0.1.7		-	fix array index out of bounds (line 236)
+// * 2013-05-16	-	0.1.8		-	test new player join team func
 //	------------------------------------------------------------------------------------
 
 
@@ -102,12 +103,23 @@ public OnPluginStart()
 {
 	PrintToServer("[Donator:Banner] Plugin start...");
 	g_HudSync = CreateHudSynchronizer();
-	HookEvent("player_team", EventTeamChange, EventHookMode_Post);
+
+	//	HookEvent("player_team", EventTeamChange, EventHookMode_Post);
+	AddCommandListener(EventTeamChange, "joinclass");
+
 	g_TagColorCookie = RegClientCookie("donator_tagcolor", "Chat color for donators.", CookieAccess_Private);
 
 	AddCommandListener(SayCallback, "donator_tag");
 	AddCommandListener(SayCallback, "donator_tagcolor");
 
+}
+
+
+public OnPluginEnd() 
+{
+    RemoveCommandListener(EventTeamChange, "joinclass");
+    RemoveCommandListener(SayCallback, "donator_tag");
+    RemoveCommandListener(SayCallback, "donator_tagcolor");
 }
 
 
@@ -160,14 +172,16 @@ public OnPostDonatorCheck(client)
 
 
 // If client joins a team and status=true, show msg and set status=false
-public Action:EventTeamChange(Handle:event, const String:name[], bool:dontBroadcast)
+//public Action:EventTeamChange(Handle:event, const String:name[], bool:dontBroadcast)
+public Action:EventTeamChange(client, const String:command[], args)
 {
-	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-	new team = GetEventInt(event, "team");
+//	new client = GetClientOfUserId(GetEventInt(event, "userid"));
+//	new team = GetEventInt(event, "team");
 
 	if (g_bClientStatus[client])
 	{
-		PrintToServer("[Donator:Banner] Player Team - Status=TRUE, team=%d", team);
+//		PrintToServer("[Donator:Banner] Player Team - Status=TRUE, team=%d", team);
+		PrintToServer("[Donator:Banner] Player Team - Status=TRUE");
 		new String:szBuffer[256];
 		GetDonatorMessage(client, szBuffer, sizeof(szBuffer));
 		ShowDonatorMessage(client, szBuffer);
@@ -177,7 +191,8 @@ public Action:EventTeamChange(Handle:event, const String:name[], bool:dontBroadc
 	}
 	else
 	{
-		PrintToServer("[Donator:Banner] Player Team - Status=FALSE, team=%d", team);
+//		PrintToServer("[Donator:Banner] Player Team - Status=FALSE, team=%d", team);
+		PrintToServer("[Donator:Banner] Player Team - Status=FALSE");
 	}
 	
 	return Plugin_Continue;
