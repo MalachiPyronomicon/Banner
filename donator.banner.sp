@@ -14,6 +14,7 @@
 // * 2013-05-16	-	0.1.6		-	add menu handling
 // * 2013-05-16	-	0.1.7		-	fix array index out of bounds (line 236)
 // * 2013-05-16	-	0.1.8		-	test new player join team func
+// * 2013-05-16	-	0.1.9		-	add timers to add brief delay before showing banner
 //	------------------------------------------------------------------------------------
 
 
@@ -27,7 +28,7 @@
 
 
 // DEFINES
-#define PLUGIN_VERSION	"0.1.7"
+#define PLUGIN_VERSION	"0.1.9"
 
 // for SetHudTextParamsEx()
 #define HUDTEXT_X_COORDINATE	-1.0
@@ -182,9 +183,8 @@ public Action:EventTeamChange(client, const String:command[], args)
 	{
 //		PrintToServer("[Donator:Banner] Player Team - Status=TRUE, team=%d", team);
 		PrintToServer("[Donator:Banner] Player Team - Status=TRUE");
-		new String:szBuffer[256];
-		GetDonatorMessage(client, szBuffer, sizeof(szBuffer));
-		ShowDonatorMessage(client, szBuffer);
+
+		g_hTimerHandle[client] = CreateTimer(1.0, CallShowDonatorMessage, client);
 		
 		// we only show the intro once
 		g_bClientStatus[client]=false;
@@ -196,6 +196,18 @@ public Action:EventTeamChange(client, const String:command[], args)
 	}
 	
 	return Plugin_Continue;
+}
+
+
+// func wrapper to deal w/timer handle
+public Action:CallShowDonatorMessage(Handle:Timer, any:client)
+{
+	new String:szBuffer[256];
+	GetDonatorMessage(client, szBuffer, sizeof(szBuffer));
+	ShowDonatorMessage(client, szBuffer);
+	
+	g_hTimerHandle[client] = INVALID_HANDLE;
+
 }
 
 
