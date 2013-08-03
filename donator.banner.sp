@@ -15,6 +15,7 @@
 // * 2013-05-16	-	0.1.7		-	fix array index out of bounds (line 236)
 // * 2013-05-16	-	0.1.8		-	test new player join team func
 // * 2013-05-16	-	0.1.9		-	add timers to add brief delay before showing banner
+// * 2013-08-03	-	0.1.10		-	also announce donator in chat
 //	------------------------------------------------------------------------------------
 
 
@@ -28,7 +29,7 @@
 
 
 // DEFINES
-#define PLUGIN_VERSION	"0.1.9"
+#define PLUGIN_VERSION	"0.1.10"
 
 // for SetHudTextParamsEx()
 #define HUDTEXT_X_COORDINATE	-1.0
@@ -203,6 +204,14 @@ public Action:EventTeamChange(client, const String:command[], args)
 public Action:CallShowDonatorMessage(Handle:Timer, any:client)
 {
 	new String:szBuffer[256];
+	decl String:sName[MAX_NAME_LENGTH];
+
+	// Print a welcome msg to chat
+	if (GetClientName(client, sName, sizeof(sName)))
+	{
+		PrintToChatAll("\x04DONATOR: \x01Welcome back %s", sName);
+	}
+
 	GetDonatorMessage(client, szBuffer, sizeof(szBuffer));
 	ShowDonatorMessage(client, szBuffer);
 	
