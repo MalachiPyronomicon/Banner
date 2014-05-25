@@ -16,6 +16,7 @@
 // * 2013-05-16	-	0.1.8		-	test new player join team func
 // * 2013-05-16	-	0.1.9		-	add timers to add brief delay before showing banner
 // * 2013-08-03	-	0.1.10		-	also announce donator in chat
+// * 2013-08-03	-	0.1.11		-	add debug msg, reorganize, fix commands
 //	------------------------------------------------------------------------------------
 
 
@@ -29,22 +30,34 @@
 
 
 // DEFINES
-#define PLUGIN_VERSION	"0.1.10"
+// Plugin Info
+#define PLUGIN_INFO_VERSION					"0.1.11"
+#define PLUGIN_INFO_NAME					"Donator Banner"
+#define PLUGIN_INFO_AUTHOR					"Malachi"
+#define PLUGIN_INFO_DESCRIPTION				"Displays the donator banner when they join the server"
+#define PLUGIN_INFO_URL						"http://www.necrophix.com/"
+#define PLUGIN_PRINT_NAME					"[Banner]"							// Used for self-identification in chat/logging
 
 // for SetHudTextParamsEx()
-#define HUDTEXT_X_COORDINATE	-1.0
-#define HUDTEXT_Y_COORDINATE	0.22
-#define HUDTEXT_HOLDTIME	8.0
-#define HUDTEXT_WHITE	{255, 255, 255, 255}
-#define HUDTEXT_BLACK	{0, 0, 0, 255}
-#define HUDTEXT_EFFECT	1
-#define HUDTEXT_FXTIME	9.0
-#define HUDTEXT_FADEINTIME	0.15
-#define HUDTEXT_FADEOUTTIME	0.15
+#define HUDTEXT_X_COORDINATE				-1.0
+#define HUDTEXT_Y_COORDINATE				0.22
+#define HUDTEXT_HOLDTIME					8.0
+#define HUDTEXT_WHITE						{255, 255, 255, 255}
+#define HUDTEXT_BLACK						{0, 0, 0, 255}
+#define HUDTEXT_EFFECT						1
+#define HUDTEXT_FXTIME						9.0
+#define HUDTEXT_FADEINTIME					0.15
+#define HUDTEXT_FADEOUTTIME					0.15
 
 // These define the text players see in the donator menu
-#define MENUTEXT_DONATOR_TAG		"Intro Banner"
-#define MENUTEXT_DONATOR_TAG_COLOR	"Intro Banner Color"
+#define MENUTEXT_DONATOR_TAG				"Intro Banner"
+#define MENUTEXT_DONATOR_TAG_COLOR			"Intro Banner Color"
+
+#define CONVAR_BANNER_TEXT 					"banner_text"
+#define CONVAR_BANNER_COLOR		 			"banner_color"
+
+#define COOKIENAME_BANNER					"donator_tagcolor"
+#define COOKIENAME_BANNER_DESCRIPTION		"Chat color for donators."
 
 
 // GLOBALS
@@ -90,29 +103,30 @@ new const String:szColorNames[tColor_Max][11] =
 };
 
 
-
+// Info
 public Plugin:myinfo = 
 {
-	name = "Donator Banner",
-	author = "Malachi",
-	description = "displays the donator banner when they join the server",
-	version = PLUGIN_VERSION,
-	url = "www.necrophix.com"
+	name = PLUGIN_INFO_NAME,
+	author = PLUGIN_INFO_AUTHOR,
+	description = PLUGIN_INFO_DESCRIPTION,
+	version = PLUGIN_INFO_VERSION,
+	url = PLUGIN_INFO_URL
 }
 
 
 public OnPluginStart()
 {
-	PrintToServer("[Donator:Banner] Plugin start...");
+	// Advertise our presence...
+	PrintToServer("%s v%s Plugin start...", PLUGIN_PRINT_NAME, PLUGIN_INFO_VERSION);
+
 	g_HudSync = CreateHudSynchronizer();
 
-	//	HookEvent("player_team", EventTeamChange, EventHookMode_Post);
 	AddCommandListener(EventTeamChange, "joinclass");
 
-	g_TagColorCookie = RegClientCookie("donator_tagcolor", "Chat color for donators.", CookieAccess_Private);
+	g_TagColorCookie = RegClientCookie(COOKIENAME_BANNER, COOKIENAME_BANNER_DESCRIPTION, CookieAccess_Private);
 
-	AddCommandListener(SayCallback, "donator_tag");
-	AddCommandListener(SayCallback, "donator_tagcolor");
+	AddCommandListener(ChangeBannerText, CONVAR_BANNER_TEXT);
+	AddCommandListener(ChangeBannerColor, CONVAR_BANNER_COLOR);
 
 }
 
@@ -120,8 +134,8 @@ public OnPluginStart()
 public OnPluginEnd() 
 {
     RemoveCommandListener(EventTeamChange, "joinclass");
-    RemoveCommandListener(SayCallback, "donator_tag");
-    RemoveCommandListener(SayCallback, "donator_tagcolor");
+    RemoveCommandListener(ChangeBannerText, CONVAR_BANNER_TEXT);
+    RemoveCommandListener(ChangeBannerColor, CONVAR_BANNER_COLOR);
 }
 
 
@@ -142,7 +156,6 @@ public OnPostDonatorCheck(client)
 {
 	if (IsPlayerDonator(client)) 
 	{
-		PrintToServer("[Donator:Banner] Post Donator Check = TRUE");
 		g_bClientStatus[client]=true;
 
 		// Grab the banner color from the cookie
@@ -165,7 +178,6 @@ public OnPostDonatorCheck(client)
 	}
 	else
 	{
-		PrintToServer("[Donator:Banner] Post Donator Check = FALSE");
 		g_bClientStatus[client]=false;
 	}
 	return;
@@ -174,26 +186,14 @@ public OnPostDonatorCheck(client)
 
 
 // If client joins a team and status=true, show msg and set status=false
-//public Action:EventTeamChange(Handle:event, const String:name[], bool:dontBroadcast)
 public Action:EventTeamChange(client, const String:command[], args)
 {
-//	new client = GetClientOfUserId(GetEventInt(event, "userid"));
-//	new team = GetEventInt(event, "team");
-
 	if (g_bClientStatus[client])
 	{
-//		PrintToServer("[Donator:Banner] Player Team - Status=TRUE, team=%d", team);
-		PrintToServer("[Donator:Banner] Player Team - Status=TRUE");
-
 		g_hTimerHandle[client] = CreateTimer(1.0, CallShowDonatorMessage, client);
 		
 		// we only show the intro once
 		g_bClientStatus[client]=false;
-	}
-	else
-	{
-//		PrintToServer("[Donator:Banner] Player Team - Status=FALSE, team=%d", team);
-		PrintToServer("[Donator:Banner] Player Team - Status=FALSE");
 	}
 	
 	return Plugin_Continue;
@@ -209,7 +209,7 @@ public Action:CallShowDonatorMessage(Handle:Timer, any:client)
 	// Print a welcome msg to chat
 	if (GetClientName(client, sName, sizeof(sName)))
 	{
-		PrintToChatAll("\x04DONATOR: \x01Welcome back %s", sName);
+		PrintToChatAll("\x04%s: \x01Welcome back %s", PLUGIN_PRINT_NAME, sName);
 	}
 
 	GetDonatorMessage(client, szBuffer, sizeof(szBuffer));
@@ -223,8 +223,6 @@ public Action:CallShowDonatorMessage(Handle:Timer, any:client)
 // Cleanup when player leaves
 public OnClientDisconnect(client)
 {
-	PrintToServer("[Donator:Banner] Disconnect - reset status");
-
 	// kill timer if we quickly disconnect
 	if(g_hTimerHandle[client] != INVALID_HANDLE)
 	{
@@ -239,7 +237,7 @@ public OnClientDisconnect(client)
 // Copied from donator.recognition.tf2.sp v0.5.15
 public ShowDonatorMessage(iClient, String:message[])
 {
-	PrintToServer("[Donator:Banner] Show Banner");
+	PrintToServer("%s Show Banner", PLUGIN_PRINT_NAME);
 
 	// Set up text location/params
 	SetHudTextParamsEx(HUDTEXT_X_COORDINATE, HUDTEXT_Y_COORDINATE, HUDTEXT_HOLDTIME, g_iTagColor[iClient], HUDTEXT_BLACK, HUDTEXT_EFFECT, HUDTEXT_FXTIME, HUDTEXT_FADEINTIME, HUDTEXT_FADEOUTTIME);
@@ -291,10 +289,19 @@ public Action:Panel_ChangeTag(iClient)
 	GetDonatorMessage(iClient, szBuffer, sizeof(szBuffer));
 	DrawPanelItem(panel, "Your current donator banner is:", ITEMDRAW_DEFAULT);
 	DrawPanelItem(panel, szBuffer, ITEMDRAW_RAWLINE);
-	DrawPanelItem(panel, "space", ITEMDRAW_SPACER);
-	DrawPanelItem(panel, "Type the following in the console to change your banner:", ITEMDRAW_CONTROL);
-	DrawPanelItem(panel, "donator_tag \"YOUR BANNER GOES HERE\"", ITEMDRAW_RAWLINE);
 	
+	DrawPanelItem(panel, "space", ITEMDRAW_SPACER);
+	
+	DrawPanelItem(panel, "Console command to change banner text:", ITEMDRAW_CONTROL);
+	
+	Format(szBuffer, sizeof(szBuffer), "%s \"YOUR BANNER GOES HERE\"", CONVAR_BANNER_TEXT);
+	DrawPanelItem(panel, szBuffer, ITEMDRAW_RAWLINE);
+	
+	DrawPanelItem(panel, "Console command to change banner color (RGB):", ITEMDRAW_CONTROL);
+	
+	Format(szBuffer, sizeof(szBuffer), "%s 0-255 0-255 0-255", CONVAR_BANNER_COLOR);
+	DrawPanelItem(panel, szBuffer, ITEMDRAW_RAWLINE);
+
 	SendPanelToClient(panel, iClient, PanelHandlerBlank, 20);
 	CloseHandle(panel);
 }
@@ -322,7 +329,7 @@ public Action:Panel_ChangeTagColor(iClient)
 }
 
 
-public Action:SayCallback(iClient, const String:command[], argc)
+public Action:ChangeBannerText(iClient, const String:command[], argc)
 {
 	if(!iClient) return Plugin_Continue;
 	if (!IsPlayerDonator(iClient)) return Plugin_Continue;
@@ -333,34 +340,44 @@ public Action:SayCallback(iClient, const String:command[], argc)
 	StripQuotes(szArg);
 	TrimString(szArg);
 
-	if (StrEqual(command, "donator_tag", true))
+	decl String:szTmp[256];
+	if (strlen(szArg) < 1)
 	{
-		decl String:szTmp[256];
-		if (strlen(szArg) < 1)
-		{
-			GetDonatorMessage(iClient, szTmp, sizeof(szTmp));
-			ReplyToCommand(iClient, "[SM] Your current banner is: %s", szTmp);
-		}
-		else
-		{
-			PrintToChat(iClient, "\x01[SM] You have sucessfully changed your banner to: \x04%s\x01", szArg);
-			SetDonatorMessage(iClient, szArg);
-		}
+		GetDonatorMessage(iClient, szTmp, sizeof(szTmp));
+		ReplyToCommand(iClient, "[SM] Your current banner is: %s", szTmp);
 	}
-	else if (StrEqual(command, "donator_tagcolor", true))
+	else
 	{
-		decl String:szTmp[3][16];
-		if (strlen(szArg) < 1)
-		{
-			GetClientCookie(iClient, g_TagColorCookie, szTmp[0], sizeof(szTmp[]));
-			ReplyToCommand(iClient, "[SM] Your current banner color is: %s", szTmp[0]);
-		}
-		else
-		{
-			ExplodeString(szArg, " ", szTmp, 3, sizeof(szTmp[]));
-			ReplyToCommand(iClient, "[SM] You have sucessfully changed your color to %s", szArg);
-			SetClientCookie(iClient, g_TagColorCookie, szArg);
-		}
+		PrintToChat(iClient, "\x01%s You have successfully changed your banner to: \x04%s\x01", PLUGIN_PRINT_NAME, szArg);
+		LogMessage("%s You have successfully changed your banner to: %s", PLUGIN_PRINT_NAME, szArg);						// DEBUG
+		SetDonatorMessage(iClient, szArg);
+	}
+	return Plugin_Handled;
+}
+
+
+public Action:ChangeBannerColor(iClient, const String:command[], argc)
+{
+	if(!iClient) return Plugin_Continue;
+	if (!IsPlayerDonator(iClient)) return Plugin_Continue;
+
+	decl String:szArg[255];
+	GetCmdArgString(szArg, sizeof(szArg));
+
+	StripQuotes(szArg);
+	TrimString(szArg);
+
+	decl String:szTmp[3][16];
+	if (strlen(szArg) < 1)
+	{
+		GetClientCookie(iClient, g_TagColorCookie, szTmp[0], sizeof(szTmp[]));
+		ReplyToCommand(iClient, "%s Your current banner color is: %s", PLUGIN_PRINT_NAME, szTmp[0]);
+	}
+	else
+	{
+		ExplodeString(szArg, " ", szTmp, 3, sizeof(szTmp[]));
+		ReplyToCommand(iClient, "%s You have successfully changed your color to %s", PLUGIN_PRINT_NAME, szArg);
+		SetClientCookie(iClient, g_TagColorCookie, szArg);
 	}
 	return Plugin_Handled;
 }
